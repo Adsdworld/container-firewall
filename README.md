@@ -15,9 +15,14 @@ any container.
 
 - It applies the rules of `/config/config`, mounted read-only, and drops
   everything else.
-- Once the rules are applied, it gives up root; a single process stays, as
-  `nobody`, with no capability but binding port 80, answering `Ok` to a `GET`
-  on `http://127.0.0.1/`.
+- Once the rules are applied, two processes stay:
+  - a checker, root with no capability but `NET_ADMIN` and no port open:
+    every 10 seconds it compares the rules in force with the ones it applied,
+    applies them again when they differ and says so in its output;
+  - the health check, as `nobody` with no capability but binding port 80:
+    `GET http://127.0.0.1/` answers `Ok` only when the last check passed less
+    than 30 seconds ago, `503 Unverified` otherwise. It reads a state, it
+    cannot trigger anything.
 - The container behind it can check that address at start: it only sees it
   from inside this container's network, so it can refuse to start without the
   firewall.

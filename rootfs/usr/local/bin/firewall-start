@@ -2,6 +2,7 @@
 set -uo pipefail
 
 CONFIG=/config/config
+STATE=/run/firewall
 
 log() {
     echo "$(date -Is) $*"
@@ -20,14 +21,22 @@ if ! nft -f - <<< "$lockdown"; then
     exit 1
 fi
 
-if ! rules="$(firewall-rules "$CONFIG")" || ! nft -f - <<< "$rules"; then
+mkdir -p "$STATE"
+chmod 755 "$STATE"
+rm -f "$STATE/verified"
+if ! firewall-rules "$CONFIG" > "$STATE/rules" || ! nft -f "$STATE/rules"; then
     log "rules not applied: everything but loopback is dropped"
     exit 1
 fi
+chmod 600 "$STATE/rules"
+nft list table inet container_firewall | sha256sum > "$STATE/expected"
+chmod 600 "$STATE/expected"
 log "rules applied from $CONFIG"
 nft list table inet container_firewall
 
-log "health check on http://127.0.0.1:80"
-exec setpriv --reuid=65534 --regid=65534 --clear-groups --no-new-privs \
+setpriv --reuid=65534 --regid=65534 --clear-groups --no-new-privs \
     --bounding-set=-all,+net_bind_service --inh-caps=-all,+net_bind_service --ambient-caps=-all,+net_bind_service \
-    socat TCP-LISTEN:80,bind=127.0.0.1,reuseaddr,fork EXEC:/usr/local/bin/firewall-health
+    socat TCP-LISTEN:80,bind=127.0.0.1,reuseaddr,fork EXEC:/usr/local/bin/firewall-health &
+log "health check on http://127.0.0.1:80"
+
+exec setpriv --bounding-set=-all,+net_admin --inh-caps=-all --no-new-privs firewall-check

@@ -5,7 +5,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY rootfs/ /
-RUN chmod 755 /usr/local/bin/firewall-start /usr/local/bin/firewall-rules /usr/local/bin/firewall-health
+RUN chmod 755 /usr/local/bin/firewall-start /usr/local/bin/firewall-rules /usr/local/bin/firewall-check /usr/local/bin/firewall-health
 
 ARG IMAGE_VERSION=dev
 ENV IMAGE_VERSION=$IMAGE_VERSION

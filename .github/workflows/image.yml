@@ -26,6 +26,7 @@ jobs:
           bash -n rootfs/usr/local/bin/firewall-start
           bash -n rootfs/usr/local/bin/firewall-rules
           bash -n rootfs/usr/local/bin/firewall-health
+          bash -n rootfs/usr/local/bin/firewall-check
           sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
           shellcheck rootfs/usr/local/bin/*
       - name: Image name
@@ -88,6 +89,19 @@ jobs:
               grep -q "^Name:\s*socat$" "$status" || continue
               grep -q "^Uid:\s*65534\s" "$status" && grep -q "^CapEff:\s*0000000000000400$" "$status" || exit 1
             done'
+          docker exec firewall bash -c 'for status in /proc/[0-9]*/status; do
+              grep -q "^Name:\s*firewall-check$" "$status" || continue
+              grep -q "^CapEff:\s*0000000000001000$" "$status" || exit 1
+            done'
+
+          docker exec firewall nft insert rule inet container_firewall output accept
+          sleep 12
+          docker logs firewall 2>&1 | grep -q 'applied again'
+          blocked 1.1.1.1 443
+          docker exec firewall nft delete table inet container_firewall
+          sleep 12
+          blocked 1.1.1.1 443
+          test "$(docker exec protected curl -fsS http://127.0.0.1/)" = Ok
 
           start "internet on\n"
           reachable 1.1.1.1 443
