@@ -1,0 +1,7 @@
+# Network rules of the container behind the firewall.
+ipv4 on
+ipv6 off
+internet on
+
+# Hosts and ports reachable on the private ranges, whether the internet is on or off.
+allow 192.168.1.2 tcp 8888,30000,30060

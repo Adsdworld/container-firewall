@@ -1,0 +1,43 @@
+#!/bin/bash
+# Applies the network rules, then keeps an unprivileged process answering on
+# the health port. Until the rules are applied, everything but loopback is
+# dropped: the container behind never has an open network.
+set -uo pipefail
+
+CONFIG="${FIREWALL_CONFIG:-/config/network}"
+PORT="${FIREWALL_HEALTH_PORT:-9999}"
+
+log() {
+    echo "$(date -Is) $*"
+}
+
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -le 1024 ] || [ "$PORT" -gt 65535 ]; then
+    log "FIREWALL_HEALTH_PORT=$PORT must be a port between 1025 and 65535"
+    PORT=""
+fi
+
+lockdown='table inet container_firewall
+delete table inet container_firewall
+table inet container_firewall {
+    chain output {
+        type filter hook output priority filter; policy drop;
+        oif "lo" accept
+    }
+}'
+if ! nft -f - <<< "$lockdown"; then
+    log "cannot apply rules: the container needs the NET_ADMIN capability"
+    exit 1
+fi
+
+if [ -z "$PORT" ] || ! rules="$(firewall-rules "$CONFIG")" || ! nft -f - <<< "$rules"; then
+    log "rules not applied: everything but loopback is dropped"
+    exit 1
+fi
+log "rules applied from $CONFIG"
+nft list table inet container_firewall
+
+# Nothing below needs a privilege: give up root and every capability.
+log "health check on 127.0.0.1:$PORT"
+exec setpriv --reuid=65534 --regid=65534 --clear-groups \
+    --inh-caps=-all --ambient-caps=-all --bounding-set=-all --no-new-privs \
+    socat "TCP-LISTEN:$PORT,bind=127.0.0.1,reuseaddr,fork" SYSTEM:'echo ok'
