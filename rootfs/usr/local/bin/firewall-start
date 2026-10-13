@@ -1,20 +1,11 @@
 #!/bin/bash
-# Applies the network rules, then keeps an unprivileged process answering on
-# the health port. Until the rules are applied, everything but loopback is
-# dropped: the container behind never has an open network.
 set -uo pipefail
 
-CONFIG="${FIREWALL_CONFIG:-/config/network}"
-PORT="${FIREWALL_HEALTH_PORT:-9999}"
+CONFIG=/config/config
 
 log() {
     echo "$(date -Is) $*"
 }
-
-if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -le 1024 ] || [ "$PORT" -gt 65535 ]; then
-    log "FIREWALL_HEALTH_PORT=$PORT must be a port between 1025 and 65535"
-    PORT=""
-fi
 
 lockdown='table inet container_firewall
 delete table inet container_firewall
@@ -29,15 +20,14 @@ if ! nft -f - <<< "$lockdown"; then
     exit 1
 fi
 
-if [ -z "$PORT" ] || ! rules="$(firewall-rules "$CONFIG")" || ! nft -f - <<< "$rules"; then
+if ! rules="$(firewall-rules "$CONFIG")" || ! nft -f - <<< "$rules"; then
     log "rules not applied: everything but loopback is dropped"
     exit 1
 fi
 log "rules applied from $CONFIG"
 nft list table inet container_firewall
 
-# Nothing below needs a privilege: give up root and every capability.
-log "health check on 127.0.0.1:$PORT"
-exec setpriv --reuid=65534 --regid=65534 --clear-groups \
-    --inh-caps=-all --ambient-caps=-all --bounding-set=-all --no-new-privs \
-    socat "TCP-LISTEN:$PORT,bind=127.0.0.1,reuseaddr,fork" SYSTEM:'echo ok'
+log "health check on http://127.0.0.1:80"
+exec setpriv --reuid=65534 --regid=65534 --clear-groups --no-new-privs \
+    --bounding-set=-all,+net_bind_service --inh-caps=-all,+net_bind_service --ambient-caps=-all,+net_bind_service \
+    socat TCP-LISTEN:80,bind=127.0.0.1,reuseaddr,fork EXEC:/usr/local/bin/firewall-health

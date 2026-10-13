@@ -1,0 +1,2 @@
+#!/bin/bash
+printf 'HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOk'

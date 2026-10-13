@@ -1,0 +1,6 @@
+ipv4 on
+ipv6 off
+internet on
+allow 192.168.1.0/24 tcp 80,443
+allow 192.168.1.2 tcp 8888,30000-30100
+allow 10.0.0.53 udp 53

@@ -13,12 +13,13 @@ any container.
 
 ## Contract
 
-- It applies the rules of `/config/network`, mounted read-only, and drops
+- It applies the rules of `/config/config`, mounted read-only, and drops
   everything else.
-- Once the rules are applied, it gives up root and every capability; a single
-  unprivileged process stays, answering a health check on a local port.
-- The container behind it can check that port at start: it only sees it from
-  inside this container's network, so it can refuse to start without the
+- Once the rules are applied, it gives up root; a single process stays, as
+  `nobody`, with no capability but binding port 80, answering `Ok` to a `GET`
+  on `http://127.0.0.1/`.
+- The container behind it can check that address at start: it only sees it
+  from inside this container's network, so it can refuse to start without the
   firewall.
 - It depends on nothing but the ability of the container engine to share a
   network namespace, which Docker, Podman, containerd and Kubernetes all have.
@@ -42,16 +43,12 @@ services:
 ```
 
 - The rules are read once, when the container starts: to change them, edit
-  `/config/network` and restart the firewall, then the protected container
+  `/config/config` and restart the firewall, then the protected container
   (Compose does both with `restart: true`).
 - Ports the protected container must publish are published on the firewall,
-  since it owns the network.
+  since it owns the network. Port 80 of `127.0.0.1` is taken by the health
+  check.
 - `docker logs firewall` shows the rules in force.
-
-| Variable | Default | Description |
-|---|---|---|
-| `FIREWALL_CONFIG` | `/config/network` | The rules file. |
-| `FIREWALL_HEALTH_PORT` | `9999` | Port of the health check, on `127.0.0.1`, between 1025 and 65535. |
 
 ### Failing closed
 
@@ -63,12 +60,12 @@ services:
 
 ### Checking the firewall from the protected container
 
-The health port is on the loopback of the shared network: the protected
+The health check is on the loopback of the shared network: the protected
 container sees it only from behind the firewall. Its entrypoint can refuse to
 start without it:
 
 ```bash
-if ! timeout 5 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9999'; then
+if [ "$(curl -fsS -m 5 http://127.0.0.1/)" != Ok ]; then
     echo "no firewall in front of this container" >&2
     exit 1
 fi
@@ -80,7 +77,9 @@ fi
 ipv4 on
 ipv6 off
 internet on
-allow 192.168.1.2 tcp 8888,30000,30060
+allow 192.168.1.0/24 tcp 80,443
+allow 192.168.1.2 tcp 8888,30000-30100
+allow 10.0.0.53 udp 53
 ```
 
 Each line is a switch or a rule; the defaults are `ipv4 on`, `ipv6 off`,
@@ -96,8 +95,7 @@ Each line is a switch or a rule; the defaults are `ipv4 on`, `ipv6 off`,
 - `allow <address or range> <tcp|udp> <ports>`: on the private ranges, only
   these are reachable, whether the internet is on or off.
 - Everything else is dropped.
-- Lines starting with `#` are comments. [`examples/network`](examples/network)
-  is a complete file.
+- [`examples/config`](examples/config) is a complete file.
 
 The private ranges are `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, and for
 IPv6 `fc00::/7`. `100.64.0.0/10` (carrier-grade NAT) and the link-local ranges
