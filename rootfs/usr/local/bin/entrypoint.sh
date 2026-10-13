@@ -1,0 +1,43 @@
+#!/bin/bash
+set -uo pipefail
+
+CONFIG=/config/config
+STATE=/run/firewall
+
+log() {
+    echo "$(date -Is) $*"
+}
+
+lockdown='table inet container_firewall
+delete table inet container_firewall
+table inet container_firewall {
+    chain output {
+        type filter hook output priority filter; policy drop;
+        oif "lo" accept
+    }
+}'
+if ! nft -f - <<< "$lockdown"; then
+    log "cannot apply rules: the container needs the NET_ADMIN capability"
+    exit 1
+fi
+
+mkdir -p "$STATE"
+chmod 755 "$STATE"
+rm -f "$STATE/check.sock"
+if ! firewall-rules "$CONFIG" > "$STATE/rules" || ! nft -f "$STATE/rules"; then
+    log "rules not applied: everything but loopback is dropped"
+    exit 1
+fi
+chmod 600 "$STATE/rules"
+nft list table inet container_firewall | sha256sum > "$STATE/expected"
+chmod 600 "$STATE/expected"
+log "rules applied from $CONFIG"
+nft list table inet container_firewall
+
+setpriv --reuid=65534 --regid=65534 --clear-groups --no-new-privs \
+    --bounding-set=-all,+net_bind_service --inh-caps=-all,+net_bind_service --ambient-caps=-all,+net_bind_service \
+    socat TCP-LISTEN:80,bind=127.0.0.1,reuseaddr,fork EXEC:/usr/local/bin/firewall-health &
+log "health check on http://127.0.0.1:80"
+
+exec setpriv --bounding-set=-all,+net_admin --inh-caps=-all --no-new-privs \
+    socat UNIX-LISTEN:"$STATE/check.sock",fork,mode=666 EXEC:/usr/local/bin/firewall-check
