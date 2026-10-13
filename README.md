@@ -58,6 +58,28 @@ services:
   check.
 - `docker logs firewall` shows the rules in force.
 
+### Health check
+
+The image declares it: ready at the first `Ok`, not ready at the first
+failure, checked every 10 seconds.
+
+```dockerfile
+HEALTHCHECK --interval=10s --timeout=6s --start-period=0s --start-interval=1s --retries=1 \
+    CMD curl -fsS http://127.0.0.1/ | grep -qx Ok
+```
+
+The same in Kubernetes:
+
+```yaml
+readinessProbe:
+  exec:
+    command: [sh, -c, "curl -fsS http://127.0.0.1/ | grep -qx Ok"]
+  periodSeconds: 10
+  timeoutSeconds: 6
+  successThreshold: 1
+  failureThreshold: 1
+```
+
 ### Failing closed
 
 - First thing at start, everything but loopback is dropped.

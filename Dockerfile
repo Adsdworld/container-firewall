@@ -11,6 +11,6 @@ ARG IMAGE_VERSION=dev
 ENV IMAGE_VERSION=$IMAGE_VERSION
 
 VOLUME ["/config"]
-HEALTHCHECK --interval=10s --timeout=3s --start-period=5s \
+HEALTHCHECK --interval=10s --timeout=6s --start-period=0s --start-interval=1s --retries=1 \
     CMD curl -fsS http://127.0.0.1/ | grep -qx Ok
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/firewall-start"]
