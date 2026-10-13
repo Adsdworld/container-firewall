@@ -61,10 +61,12 @@ services:
 ### Health check
 
 The image declares it: ready at the first `Ok`, not ready at the first
-failure, checked every 10 seconds.
+failure. It is checked every second for the first 10 seconds, so the
+container is ready as soon as the rules are in force, then every 10 seconds.
+Docker Engine 25 or later is needed for `--start-interval`.
 
 ```dockerfile
-HEALTHCHECK --interval=10s --timeout=6s --start-period=0s --start-interval=1s --retries=1 \
+HEALTHCHECK --interval=10s --timeout=6s --start-period=10s --start-interval=1s --retries=1 \
     CMD curl -fsS http://127.0.0.1/ | grep -qx Ok
 ```
 
@@ -74,6 +76,7 @@ The same in Kubernetes:
 readinessProbe:
   exec:
     command: [sh, -c, "curl -fsS http://127.0.0.1/ | grep -qx Ok"]
+  initialDelaySeconds: 1
   periodSeconds: 10
   timeoutSeconds: 6
   successThreshold: 1
