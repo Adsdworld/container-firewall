@@ -5,7 +5,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY rootfs/ /
-RUN chmod 755 /usr/local/bin/firewall-start /usr/local/bin/firewall-rules /usr/local/bin/firewall-check /usr/local/bin/firewall-health
+RUN chmod 755 /usr/local/bin/entrypoint.sh /usr/local/bin/firewall-rules /usr/local/bin/firewall-check /usr/local/bin/firewall-health
 
 ARG IMAGE_VERSION=dev
 ENV IMAGE_VERSION=$IMAGE_VERSION
@@ -13,4 +13,4 @@ ENV IMAGE_VERSION=$IMAGE_VERSION
 VOLUME ["/config"]
 HEALTHCHECK --interval=10s --timeout=6s --start-period=10s --start-interval=1s --retries=1 \
     CMD curl -fsS http://127.0.0.1/ | grep -qx Ok
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/firewall-start"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

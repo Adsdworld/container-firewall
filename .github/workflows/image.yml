@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Check the scripts
         run: |
-          bash -n rootfs/usr/local/bin/firewall-start
+          bash -n rootfs/usr/local/bin/entrypoint.sh
           bash -n rootfs/usr/local/bin/firewall-rules
           bash -n rootfs/usr/local/bin/firewall-health
           bash -n rootfs/usr/local/bin/firewall-check
