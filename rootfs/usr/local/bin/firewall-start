@@ -23,7 +23,7 @@ fi
 
 mkdir -p "$STATE"
 chmod 755 "$STATE"
-rm -f "$STATE/verified"
+rm -f "$STATE/check.sock"
 if ! firewall-rules "$CONFIG" > "$STATE/rules" || ! nft -f "$STATE/rules"; then
     log "rules not applied: everything but loopback is dropped"
     exit 1
@@ -39,4 +39,5 @@ setpriv --reuid=65534 --regid=65534 --clear-groups --no-new-privs \
     socat TCP-LISTEN:80,bind=127.0.0.1,reuseaddr,fork EXEC:/usr/local/bin/firewall-health &
 log "health check on http://127.0.0.1:80"
 
-exec setpriv --bounding-set=-all,+net_admin --inh-caps=-all --no-new-privs firewall-check
+exec setpriv --bounding-set=-all,+net_admin --inh-caps=-all --no-new-privs \
+    socat UNIX-LISTEN:"$STATE/check.sock",fork,mode=666 EXEC:/usr/local/bin/firewall-check

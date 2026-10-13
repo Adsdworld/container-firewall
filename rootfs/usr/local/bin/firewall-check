@@ -2,22 +2,20 @@
 set -uo pipefail
 
 STATE=/run/firewall
-CHECK_INTERVAL=10
 
 log() {
-    echo "$(date -Is) $*"
+    echo "$(date -Is) $*" >&2
 }
 
+exec 9> "$STATE/lock"
+flock 9
 expected="$(cat "$STATE/expected")"
-while true; do
-    if [ "$(nft list table inet container_firewall 2> /dev/null | sha256sum)" = "$expected" ]; then
-        touch "$STATE/verified"
-    elif nft -f "$STATE/rules" && [ "$(nft list table inet container_firewall | sha256sum)" = "$expected" ]; then
-        log "the rules in force differed from /config/config: applied again"
-        touch "$STATE/verified"
-    else
-        log "the rules in force differ from /config/config and cannot be applied again"
-        rm -f "$STATE/verified"
-    fi
-    sleep "$CHECK_INTERVAL"
-done
+if [ "$(nft list table inet container_firewall 2> /dev/null | sha256sum)" = "$expected" ]; then
+    echo ok
+elif nft -f "$STATE/rules" && [ "$(nft list table inet container_firewall | sha256sum)" = "$expected" ]; then
+    log "the rules in force differed from /config/config: applied again"
+    echo ok
+else
+    log "the rules in force differ from /config/config and cannot be applied again"
+    echo failed
+fi

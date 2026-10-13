@@ -16,13 +16,16 @@ any container.
 - It applies the rules of `/config/config`, mounted read-only, and drops
   everything else.
 - Once the rules are applied, two processes stay:
-  - a checker, root with no capability but `NET_ADMIN` and no port open:
-    every 10 seconds it compares the rules in force with the ones it applied,
-    applies them again when they differ and says so in its output;
+  - the checker, root with no capability but `NET_ADMIN`, listening only on a
+    Unix socket inside this container: on each request it compares the rules
+    in force with the ones it applied, applies them again when they differ,
+    says so in its output, and answers whether the rules are in force;
   - the health check, as `nobody` with no capability but binding port 80:
-    `GET http://127.0.0.1/` answers `Ok` only when the last check passed less
-    than 30 seconds ago, `503 Unverified` otherwise. It reads a state, it
-    cannot trigger anything.
+    each `GET http://127.0.0.1/` asks the checker, then answers `Ok` when the
+    rules are in force at that moment, `503 Unverified` otherwise. It holds no
+    privilege: all a caller can do is ask for a check.
+- The checker is the container's main process: if it stops, the container
+  stops.
 - The container behind it can check that address at start: it only sees it
   from inside this container's network, so it can refuse to start without the
   firewall.

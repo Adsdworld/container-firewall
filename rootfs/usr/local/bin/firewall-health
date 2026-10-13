@@ -1,11 +1,7 @@
 #!/bin/bash
 set -uo pipefail
 
-STATE=/run/firewall
-MAX_AGE=30
-
-verified="$(stat -c %Y "$STATE/verified" 2> /dev/null || echo 0)"
-if [ $(($(date +%s) - verified)) -le "$MAX_AGE" ]; then
+if [ "$(timeout 5 socat -T 5 - UNIX-CONNECT:/run/firewall/check.sock < /dev/null 2> /dev/null)" = ok ]; then
     printf 'HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOk'
 else
     printf 'HTTP/1.0 503 Service Unavailable\r\nContent-Type: text/plain\r\nContent-Length: 10\r\n\r\nUnverified'
